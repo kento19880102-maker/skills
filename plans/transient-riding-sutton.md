@@ -1,81 +1,145 @@
-# 副業アイデア スキル作成プラン
+# 副業アイデア 親子スキル アーキテクチャ
 
 ## Context
 
-ユーザーが副業のアイデアをブレインストーミング・評価・比較できるスキルを作成する。ユーザーの状況（スキル・可処分時間・予算・リスク許容度）に基づきパーソナライズされた提案を行うフレームワークを提供する。
+既存の単一スキル `side-biz-ideas` を、5つの子スキル＋1つの親スキルに分割する。各子スキルは独立して使用可能であり、親スキルが一気通貫で全ステップを順番に実行する。これにより、各ステップの品質向上と再利用性を実現する。
 
-## スキル構成
+## アーキテクチャ
 
 ```
-.claude/skills/side-biz-ideas/
-├── SKILL.md                      # メイン指示（必須）
-└── references/
-    └── idea-categories.md        # カテゴリ別の詳細情報
+User → [side-biz-planner] (親スキル)
+           │
+           ├─1→ [side-biz-hearing]     → ユーザープロファイル
+           │
+           ├─2→ [side-biz-idea-gen]    → 3-5個のアイデア（構造化分析付き）
+           │        reads: references/idea-categories.md
+           │
+           ├─3→ [side-biz-evaluator]   → 10項目の深掘り評価
+           │
+           ├─4→ [side-biz-compare]     → 比較マトリクス＋推薦
+           │        ↓ ユーザーにアイデア選択を確認
+           └─5→ [side-biz-actionplan]  → 90日間行動計画
 ```
 
-- **scripts/ は不要**: 計算処理やファイル変換がなく、すべてClaude の推論で対応可能
-- **assets/ は不要**: テキストベースの出力のみ
+## ディレクトリ構成
+
+```
+.claude/skills/
+├── side-biz-planner/           # 親スキル（オーケストレーター）
+│   └── SKILL.md
+├── side-biz-hearing/           # 子1: ヒアリング
+│   └── SKILL.md
+├── side-biz-idea-gen/          # 子2: アイデア生成
+│   ├── SKILL.md
+│   └── references/
+│       └── idea-categories.md  # 既存ファイルを移動
+├── side-biz-evaluator/         # 子3: アイデア評価
+│   └── SKILL.md
+├── side-biz-compare/           # 子4: 比較分析
+│   └── SKILL.md
+└── side-biz-actionplan/        # 子5: アクションプラン
+    └── SKILL.md
+```
+
+## バリデーター制約
+
+`quick_validate.py` が許可するフロントマター: `name`, `description`, `license`, `allowed-tools`, `metadata` のみ。
+`disable-model-invocation`, `user-invocable`, `context` は使用不可。
+→ 子スキルのdescriptionを狭いキーワードにし、親スキルに広いキーワードを持たせて棲み分ける。
 
 ## 実装手順
 
-### Step 1: init_skill.py でスキルを初期化
+### Step 1: 既存スキルの削除
+
+`side-biz-ideas/` を削除（`idea-categories.md` は `side-biz-idea-gen` に移動するため内容を保持）。
+`side-biz-ideas.skill` パッケージファイルも削除。
+
+### Step 2: 6つのスキルを init_skill.py で初期化
 
 ```bash
-python .claude/skills/skill-creator/scripts/init_skill.py side-biz-ideas \
-  --path .claude/skills \
-  --resources references
+for skill in side-biz-hearing side-biz-idea-gen side-biz-evaluator side-biz-compare side-biz-actionplan side-biz-planner; do
+  python3 .claude/skills/skill-creator/scripts/init_skill.py $skill --path .claude/skills
+done
+# side-biz-idea-gen のみ references ディレクトリ追加
+mkdir -p .claude/skills/side-biz-idea-gen/references
 ```
 
-### Step 2: SKILL.md を作成
+### Step 3: 各 SKILL.md を作成
 
-**Frontmatter:**
-- `name`: `side-biz-ideas`
-- `description`: 日本語トリガーワード（「副業」「サイドビジネス」「副収入」「稼ぎたい」等）＋英語トリガーを含む包括的な説明
+#### 子1: side-biz-hearing
+- ヒアリング5項目（スキル・興味・時間・予算・リスク）
+- 出力フォーマット: プロファイル表
+- $ARGUMENTS 対応（親から情報が渡された場合は重複質問を避ける）
+- トリガー: 「副業ヒアリング」「状況を整理したい」等の狭いキーワード
 
-**Body の構成:**
+#### 子2: side-biz-idea-gen
+- 8カテゴリから横断的に3〜5個のアイデア提案
+- 各アイデアに10項目の分析フレームワーク
+- `references/idea-categories.md` 参照（既存内容を移動）
+- トリガー: 「アイデアを出して」「何を始めればいい？」等
 
-1. **ヒアリング** — 5項目（スキル・興味・可処分時間・初期予算・リスク許容度）を自然な会話で確認
-2. **アイデア提案** — 3〜5個のアイデアに構造化分析を付与（概要、マッチ度★、市場ポテンシャル、初期投資、初収益までの期間、月収レンジ、スケーラビリティ、必要時間、リスク、最初の一歩）
-3. **比較と絞り込み** — 比較マトリクス表 + 深掘り分析（ビジネスモデル、開始手順、ツール、差別化、失敗パターン）
-4. **注意事項** — 法的助言の免責、断定的表現の回避、投資助言の制限、就業規則確認の促し
+#### 子3: side-biz-evaluator
+- 10項目の深掘り分析（ビジネスモデル、市場分析、収益シミュレーション、リスク分析等）
+- トリガー: 「評価して」「深掘り」「実現可能性」等
 
-**カテゴリ（8種）:**
-- デジタルプロダクト / フリーランス・受託 / コンテンツ制作 / EC・物販 / コンサルティング / SaaS・アプリ開発 / 教育・スキルシェア / 投資・資産運用
+#### 子4: side-biz-compare
+- 比較マトリクス表の作成
+- 優先事項に基づくランキング（即金性/高収入/低リスク/スケーラビリティ/最小時間）
+- 組み合わせ戦略の提案
+- トリガー: 「比較して」「どっちがいい？」「ランキング」等
 
-### Step 3: references/idea-categories.md を作成
+#### 子5: side-biz-actionplan
+- 90日間ロードマップ（4フェーズ: 準備→MVP→初収益→拡大）
+- 必要ツール・プラットフォーム一覧
+- KPI設定、法務・税務チェックリスト
+- トリガー: 「アクションプラン」「行動計画」「始め方」等
 
-各カテゴリについて以下をまとめる（200-300行程度）:
-- ビジネスモデルの特徴・収益構造
-- 日本での主要プラットフォーム（CrowdWorks、Lancers、ココナラ、メルカリ、BASE、note、Udemy Japan 等）
-- 現実的な収益レンジ
-- 必要なスキルレベル（初級/中級/上級）
-- 始めるためのコスト
-- 日本固有の考慮事項（確定申告20万円ルール、開業届、インボイス制度等）
+#### 親: side-biz-planner
+- `allowed-tools: Skill(side-biz-hearing), Skill(side-biz-idea-gen), Skill(side-biz-evaluator), Skill(side-biz-compare), Skill(side-biz-actionplan)`
+- 5ステップの順次実行ワークフロー
+- 各ステップ間でユーザー確認
+- Step 4後にアイデア選択を促し、Step 2への戻りも可能
+- トリガー: 「副業」「サイドビジネス」「副収入」「稼ぎたい」等の広いキーワード
 
-### Step 4: バリデーション
+### Step 4: references/idea-categories.md を配置
+
+既存の `side-biz-ideas/references/idea-categories.md` の内容を `side-biz-idea-gen/references/idea-categories.md` にコピー。
+
+### Step 5: 全スキルのバリデーション
 
 ```bash
-python .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/side-biz-ideas
+for skill in side-biz-hearing side-biz-idea-gen side-biz-evaluator side-biz-compare side-biz-actionplan side-biz-planner; do
+  python3 .claude/skills/skill-creator/scripts/quick_validate.py .claude/skills/$skill
+done
 ```
 
-### Step 5: パッケージング
+### Step 6: パッケージング
 
 ```bash
-python .claude/skills/skill-creator/scripts/package_skill.py .claude/skills/side-biz-ideas
+for skill in side-biz-hearing side-biz-idea-gen side-biz-evaluator side-biz-compare side-biz-actionplan side-biz-planner; do
+  python3 .claude/skills/skill-creator/scripts/package_skill.py .claude/skills/$skill
+done
 ```
 
 ## 対象ファイル
 
 | ファイル | 操作 |
 |---------|------|
-| `.claude/skills/side-biz-ideas/SKILL.md` | 新規作成 |
-| `.claude/skills/side-biz-ideas/references/idea-categories.md` | 新規作成 |
+| `.claude/skills/side-biz-ideas/` | 削除 |
+| `side-biz-ideas.skill` | 削除 |
+| `.claude/skills/side-biz-planner/SKILL.md` | 新規作成 |
+| `.claude/skills/side-biz-hearing/SKILL.md` | 新規作成 |
+| `.claude/skills/side-biz-idea-gen/SKILL.md` | 新規作成 |
+| `.claude/skills/side-biz-idea-gen/references/idea-categories.md` | 移動（既存内容） |
+| `.claude/skills/side-biz-evaluator/SKILL.md` | 新規作成 |
+| `.claude/skills/side-biz-compare/SKILL.md` | 新規作成 |
+| `.claude/skills/side-biz-actionplan/SKILL.md` | 新規作成 |
 
 ## 検証方法
 
-1. `quick_validate.py` でスキル構造を検証
-2. `package_skill.py` でパッケージングが成功することを確認
-3. 以下のテストクエリで動作確認:
-   - 「プログラマーで週10時間使えます。予算5万円で副業始めたい」
-   - 「デザインが得意でリスク低めの副業を探しています」
-   - 「SaaSとフリーランス、どっちが良い？」
+1. 全6スキルが `quick_validate.py` を通過すること
+2. 全6スキルが `package_skill.py` でパッケージングできること
+3. テストクエリ:
+   - 親スキル: 「副業を始めたい」→ side-biz-planner が起動し、5ステップを順次実行
+   - 子スキル単体: 「このアイデアを評価して」→ side-biz-evaluator が単体で起動
+   - 子スキル単体: 「フリーランスとSaaS、比較して」→ side-biz-compare が単体で起動
