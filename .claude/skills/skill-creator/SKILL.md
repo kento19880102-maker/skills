@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Create, edit, improve, or audit AgentSkills. Use when creating a new skill from scratch or when asked to improve, review, audit, tidy up, or clean up an existing skill or SKILL.md file. Also use when editing or restructuring a skill directory (moving files to references/ or scripts/, removing stale content, validating against the AgentSkills spec). Triggers on phrases like "create a skill", "author a skill", "tidy up a skill", "improve this skill", "review the skill", "clean up the skill", "audit the skill".
+description: Create, edit, improve, or audit AgentSkills. Use when creating a new skill from scratch or when asked to improve, review, audit, tidy up, or clean up an existing skill or SKILL.md file. Also use when editing or restructuring a skill directory (moving files to references/ or scripts/, removing stale content, validating against the AgentSkills spec). Triggers on phrases like "create a skill", "author a skill", "tidy up a skill", "improve this skill", "review the skill", "clean up the skill", "audit the skill". Also triggers on "refactor the skill", "slim down SKILL.md", "extract to references", "SKILL.mdをスリム化", "詳細をreferencesに分離", "スキルをリファクタリング".
 ---
 
 # Skill Creator
@@ -301,6 +301,7 @@ Consult these helpful guides based on your skill's needs:
 
 - **Multi-step processes**: See references/workflows.md for sequential workflows and conditional logic
 - **Specific output formats or quality standards**: See references/output-patterns.md for template and example patterns
+- **Refactoring a bloated SKILL.md**: See [references/refactoring-guide.md](references/refactoring-guide.md) for extracting detailed specs into reference files
 
 These files contain established best practices for effective skill design.
 
@@ -370,3 +371,12 @@ After testing the skill, users may request improvements. Often this happens righ
 2. Notice struggles or inefficiencies
 3. Identify how SKILL.md or bundled resources should be updated
 4. Implement changes and test again
+
+#### Refactoring an Existing Skill
+
+When an existing SKILL.md has grown too large or contains detailed tables/templates that inflate context cost, follow [references/refactoring-guide.md](references/refactoring-guide.md) to extract details into references/ files. The guide covers:
+
+- Trigger conditions (when to refactor)
+- 7 content categories to extract (scoring rubrics, templates, JSON schemas, etc.)
+- Step-by-step extraction process
+- The 「詳細仕様ドキュメント」summary table pattern
