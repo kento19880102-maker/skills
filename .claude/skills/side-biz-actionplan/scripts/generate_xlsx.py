@@ -9,7 +9,6 @@ Usage:
 """
 import sys
 import json
-import os
 
 try:
     from openpyxl import Workbook
@@ -113,7 +112,7 @@ def create_actionplan_sheet(wb, data):
             ws.cell(row=r, column=3, value=sanitize_cell(phase_name))
             ws.cell(row=r, column=4, value=sanitize_cell(task.get("task", "")))
             ws.cell(row=r, column=5, value=sanitize_cell(task.get("category", "")))
-            ws.cell(row=r, column=6, value=task.get("hours", ""))
+            ws.cell(row=r, column=6, value=sanitize_cell(task.get("hours", "")))
             ws.cell(row=r, column=7, value=sanitize_cell(task.get("output", "")))
             ws.cell(row=r, column=8, value="☐")
             style_row(ws, r, COLS, bg=bg)
