@@ -102,8 +102,8 @@ def create_actionplan_sheet(wb, data):
     r += 1
 
     for pi, phase in enumerate(data.get("phases", [])):
-        phase_name = phase.get("name", f"Phase {pi+1}")
-        phase_label = phase.get("label", "")
+        phase_name = sanitize_cell(phase.get("name", f"Phase {pi+1}"))
+        phase_label = sanitize_cell(phase.get("label", ""))
         section_row(ws, r, COLS, f"■ {phase_name}: {phase_label}")
         r += 1
         bg = PHASE_COLORS[pi % len(PHASE_COLORS)]
@@ -142,7 +142,7 @@ def create_kpi_sheet(wb, data):
     r += 1
 
     for pi, phase in enumerate(data.get("phases", [])):
-        phase_name = phase.get("name", f"Phase {pi+1}")
+        phase_name = sanitize_cell(phase.get("name", f"Phase {pi+1}"))
         bg = PHASE_COLORS[pi % len(PHASE_COLORS)]
         kpis = phase.get("kpis", [])
         start_r = r
