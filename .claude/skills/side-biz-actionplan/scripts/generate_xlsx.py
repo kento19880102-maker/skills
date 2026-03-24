@@ -18,6 +18,16 @@ except ImportError:
     print("ERROR: openpyxl が必要です。pip install openpyxl を実行してください。", file=sys.stderr)
     sys.exit(1)
 
+
+def sanitize_cell(value):
+    """Excel formula injection を防止するサニタイズ関数。
+    入力JSONは信頼できないものとして扱い、数式トリガー文字を無害化する。"""
+    if not isinstance(value, str):
+        return value
+    if value and value[0] in ('=', '+', '-', '@', '\t', '\r', '\n'):
+        return "'" + value
+    return value
+
 # Color palette
 COLORS = {
     "header": "1F3864",
@@ -74,13 +84,13 @@ def create_actionplan_sheet(wb, data):
         ws.column_dimensions[col].width = w
 
     ws.merge_cells('A1:H1')
-    ws['A1'].value = data.get("title", "90日間アクションプラン")
+    ws['A1'].value = sanitize_cell(data.get("title", "90日間アクションプラン"))
     ws['A1'].font = Font(name='Arial', bold=True, size=14, color="1F3864")
     ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
     ws.row_dimensions[1].height = 35
 
     ws.merge_cells('A2:H2')
-    ws['A2'].value = data.get("subtitle", "")
+    ws['A2'].value = sanitize_cell(data.get("subtitle", ""))
     ws['A2'].font = Font(name='Arial', size=10, color='666666')
     ws['A2'].alignment = Alignment(horizontal='center')
 
@@ -98,13 +108,13 @@ def create_actionplan_sheet(wb, data):
         r += 1
         bg = PHASE_COLORS[pi % len(PHASE_COLORS)]
         for task in phase.get("tasks", []):
-            ws.cell(row=r, column=1, value=str(task.get("day", "")))
-            ws.cell(row=r, column=2, value=task.get("week", ""))
-            ws.cell(row=r, column=3, value=phase_name)
-            ws.cell(row=r, column=4, value=task.get("task", ""))
-            ws.cell(row=r, column=5, value=task.get("category", ""))
+            ws.cell(row=r, column=1, value=sanitize_cell(str(task.get("day", ""))))
+            ws.cell(row=r, column=2, value=sanitize_cell(task.get("week", "")))
+            ws.cell(row=r, column=3, value=sanitize_cell(phase_name))
+            ws.cell(row=r, column=4, value=sanitize_cell(task.get("task", "")))
+            ws.cell(row=r, column=5, value=sanitize_cell(task.get("category", "")))
             ws.cell(row=r, column=6, value=task.get("hours", ""))
-            ws.cell(row=r, column=7, value=task.get("output", ""))
+            ws.cell(row=r, column=7, value=sanitize_cell(task.get("output", "")))
             ws.cell(row=r, column=8, value="☐")
             style_row(ws, r, COLS, bg=bg)
             for c in [1, 2, 6, 8]:
@@ -138,8 +148,8 @@ def create_kpi_sheet(wb, data):
         start_r = r
         for ki, kpi in enumerate(kpis):
             ws.cell(row=r, column=1, value=phase_name if ki == 0 else "")
-            ws.cell(row=r, column=2, value=kpi.get("item", ""))
-            ws.cell(row=r, column=3, value=kpi.get("target", ""))
+            ws.cell(row=r, column=2, value=sanitize_cell(kpi.get("item", "")))
+            ws.cell(row=r, column=3, value=sanitize_cell(kpi.get("target", "")))
             ws.cell(row=r, column=4, value="")
             ws.cell(row=r, column=5, value="")
             ws.cell(row=r, column=6, value="☐")
@@ -170,14 +180,14 @@ def create_tools_sheet(wb, data):
     r += 1
 
     for group in data.get("tool_groups", []):
-        section_row(ws, r, COLS, group.get("label", ""))
+        section_row(ws, r, COLS, sanitize_cell(group.get("label", "")))
         r += 1
         for tool in group.get("tools", []):
-            ws.cell(row=r, column=1, value=tool.get("name", ""))
-            ws.cell(row=r, column=2, value=tool.get("purpose", ""))
-            ws.cell(row=r, column=3, value=tool.get("cost", ""))
-            ws.cell(row=r, column=4, value=tool.get("priority", ""))
-            ws.cell(row=r, column=5, value=tool.get("note", ""))
+            ws.cell(row=r, column=1, value=sanitize_cell(tool.get("name", "")))
+            ws.cell(row=r, column=2, value=sanitize_cell(tool.get("purpose", "")))
+            ws.cell(row=r, column=3, value=sanitize_cell(tool.get("cost", "")))
+            ws.cell(row=r, column=4, value=sanitize_cell(tool.get("priority", "")))
+            ws.cell(row=r, column=5, value=sanitize_cell(tool.get("note", "")))
             style_row(ws, r, COLS)
             ws.cell(row=r, column=3).alignment = Alignment(horizontal='center', vertical='center')
             ws.cell(row=r, column=4).alignment = Alignment(horizontal='center', vertical='center')
@@ -207,37 +217,49 @@ def create_legal_sheet(wb, data):
 
     for item in data.get("legal_items", []):
         ws.cell(row=r, column=1, value="☐")
-        ws.cell(row=r, column=2, value=item.get("item", ""))
-        ws.cell(row=r, column=3, value=item.get("detail", ""))
-        ws.cell(row=r, column=4, value=item.get("timing", ""))
+        ws.cell(row=r, column=2, value=sanitize_cell(item.get("item", "")))
+        ws.cell(row=r, column=3, value=sanitize_cell(item.get("detail", "")))
+        ws.cell(row=r, column=4, value=sanitize_cell(item.get("timing", "")))
         style_row(ws, r, COLS)
         ws.cell(row=r, column=1).alignment = Alignment(horizontal='center', vertical='center')
         ws.row_dimensions[r].height = 35
         r += 1
 
-def create_review_sheet(wb, weeks=12):
+def create_review_sheet(wb, weeks=12, kpi_columns=None):
+    """週次振り返りシートを生成する。
+    kpi_columns: KPI列名のリスト。未指定時は汎用デフォルトを使用。"""
+    if kpi_columns is None:
+        kpi_columns = ['主要KPI 1', '主要KPI 2', '主要KPI 3']
+    headers = ['Week'] + [sanitize_cell(c) for c in kpi_columns] + ['今週の学び', '来週やること']
     ws = wb.create_sheet("週次振り返り")
-    COLS = 7
-    widths = {'A': 10, 'B': 14, 'C': 14, 'D': 14, 'E': 14, 'F': 30, 'G': 30}
-    for col, w in widths.items():
-        ws.column_dimensions[col].width = w
+    COLS = len(headers)
+    # 列幅: Week=10, KPI列=14, 学び/やること=30
+    col_letters = [chr(ord('A') + i) for i in range(COLS)]
+    for i, col in enumerate(col_letters):
+        if i == 0:
+            ws.column_dimensions[col].width = 10
+        elif i >= COLS - 2:
+            ws.column_dimensions[col].width = 30
+        else:
+            ws.column_dimensions[col].width = 14
 
-    ws.merge_cells('A1:G1')
+    end_col = col_letters[-1]
+    ws.merge_cells(f'A1:{end_col}1')
     ws['A1'].value = "週次振り返りシート（毎週日曜15分）"
     ws['A1'].font = Font(name='Arial', bold=True, size=14, color="1F3864")
     ws['A1'].alignment = Alignment(horizontal='center')
     ws.row_dimensions[1].height = 30
 
     r = 3
-    for i, h in enumerate(['Week', 'note PV', 'Xフォロワー', 'DB登録数', '収益(円)', '今週の学び', '来週やること'], 1):
+    for i, h in enumerate(headers, 1):
         ws.cell(row=r, column=i, value=h)
     style_header(ws, r, COLS)
     r += 1
 
     phase_week_ranges = [(1, 2), (3, 4), (5, 8), (9, 12)]
     for w in range(1, weeks + 1):
-        pi = next(i for i, (s, e) in enumerate(phase_week_ranges) if s <= w <= e)
-        bg = PHASE_COLORS[pi]
+        pi = next((i for i, (s, e) in enumerate(phase_week_ranges) if s <= w <= e), len(phase_week_ranges) - 1)
+        bg = PHASE_COLORS[pi % len(PHASE_COLORS)]
         ws.cell(row=r, column=1, value=f"Week {w}")
         style_row(ws, r, COLS, bg=bg)
         ws.cell(row=r, column=1).alignment = Alignment(horizontal='center', vertical='center')
@@ -250,7 +272,7 @@ def generate(output_path, data):
     create_kpi_sheet(wb, data)
     create_tools_sheet(wb, data)
     create_legal_sheet(wb, data)
-    create_review_sheet(wb, data.get("weeks", 12))
+    create_review_sheet(wb, data.get("weeks", 12), data.get("review_columns"))
     wb.save(output_path)
     return output_path
 
