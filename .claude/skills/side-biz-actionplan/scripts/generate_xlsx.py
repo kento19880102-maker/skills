@@ -13,6 +13,7 @@ import json
 try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
 except ImportError:
     print("ERROR: openpyxl が必要です。pip install openpyxl を実行してください。", file=sys.stderr)
     sys.exit(1)
@@ -233,16 +234,16 @@ def create_review_sheet(wb, weeks=12, kpi_columns=None):
     ws = wb.create_sheet("週次振り返り")
     COLS = len(headers)
     # 列幅: Week=10, KPI列=14, 学び/やること=30
-    col_letters = [chr(ord('A') + i) for i in range(COLS)]
-    for i, col in enumerate(col_letters):
-        if i == 0:
+    for i in range(1, COLS + 1):
+        col = get_column_letter(i)
+        if i == 1:
             ws.column_dimensions[col].width = 10
-        elif i >= COLS - 2:
+        elif i >= COLS - 1:
             ws.column_dimensions[col].width = 30
         else:
             ws.column_dimensions[col].width = 14
 
-    end_col = col_letters[-1]
+    end_col = get_column_letter(COLS)
     ws.merge_cells(f'A1:{end_col}1')
     ws['A1'].value = "週次振り返りシート（毎週日曜15分）"
     ws['A1'].font = Font(name='Arial', bold=True, size=14, color="1F3864")
